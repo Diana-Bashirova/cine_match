@@ -32,6 +32,6 @@ jobs:
       run: python manage.py check --deploy --settings=config.settings
     
     - name: Run tests
-      run: pytest --ds=config.settings -v
+      run: pytest . --ds=config.settings -v
       env:
         DJANGO_SETTINGS_MODULE: config.settings
