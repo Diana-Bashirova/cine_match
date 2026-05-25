@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema
 from .scorer import calculate_score
-from rooms.models import Room, RoomVote
-from movies.models import Movie
+from apps.rooms.models import Room, RoomVote
+from apps.movies.models import Movie
 
 logger = logging.getLogger('recommendations')
 

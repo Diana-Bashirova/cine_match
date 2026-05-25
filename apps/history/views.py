@@ -7,6 +7,6 @@ from rest_framework.response import Response
 def history_list(request):
     return Response({
         "status": "ok",
-        "message": "Функционал истории просмотров находится в разработке",
+        "message": "История просмотров в разработке",
         "data": []
     })

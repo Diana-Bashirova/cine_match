@@ -1,4 +1,3 @@
-# seed_full_dataset.py
 import os
 import django
 import requests
@@ -8,21 +7,19 @@ from io import StringIO
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from movies.models import Movie
+from apps.movies.models import Movie
 
 DATASET_URL = "https://raw.githubusercontent.com/danielgrijalva/movie-stats/master/movies.csv"
-BATCH_SIZE = 500  # Пакетная вставка ускоряет работу и экономит RAM
+BATCH_SIZE = 500
 
 def seed_full_dataset():
-    print("📥 Загрузка датасета...")
     response = requests.get(DATASET_URL)
     response.raise_for_status()
 
-    print("🔄 Парсинг и очистка данных...")
     reader = csv.DictReader(StringIO(response.text))
     buffer = []
     total_added = 0
-    base_id = 10_000_000  # Уникальный префикс, чтобы не пересекаться с ручными фильмами
+    base_id = 10_000_000
 
     for i, row in enumerate(reader):
         try:
@@ -31,10 +28,8 @@ def seed_full_dataset():
                 continue
 
             year = int(row["year"]) if row.get("year", "").isdigit() else None
-            
             duration_str = row.get("minutes", "").strip()
             duration = int(float(duration_str)) if duration_str and duration_str.replace('.','',1).isdigit() else None
-
             rating_str = row.get("rating", "").strip()
             imdb = float(rating_str) if rating_str and rating_str.replace('.','',1).isdigit() else None
 
@@ -56,9 +51,8 @@ def seed_full_dataset():
             if len(buffer) >= BATCH_SIZE:
                 Movie.objects.bulk_create(buffer, ignore_conflicts=True)
                 total_added += len(buffer)
-                print(f"  ✅ Вставлено: {total_added}...")
+                print(f"Вставлено: {total_added}")
                 buffer.clear()
-
         except Exception:
             continue
 
@@ -66,10 +60,7 @@ def seed_full_dataset():
         Movie.objects.bulk_create(buffer, ignore_conflicts=True)
         total_added += len(buffer)
 
-    final_count = Movie.objects.count()
-    print(f"🎉 Готово! Всего фильмов в базе: {final_count}")
-    if final_count < 5000:
-        print("⚠️  Некоторые строки пропущены из-за пустых названий/жанров или дублей.")
+    print(f"Готово. Всего фильмов в базе: {Movie.objects.count()}")
 
 if __name__ == "__main__":
     seed_full_dataset()

@@ -1,4 +1,3 @@
-# Python
 __pycache__/
 *.py[cod]
 *.so
@@ -6,27 +5,20 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-
-# Виртуальное окружение
 venv/
 env/
 ENV/
-
-# Django
-*.log
-local_settings.py
 db.sqlite3
 db.sqlite3-journal
+logs/
+*.log
+local_settings.py
 media/
 staticfiles/
-
-# IDE и ОС
 .vscode/
 .idea/
 *.swp
 *.swo
 .DS_Store
 Thumbs.db
-
-# Секреты
 .env

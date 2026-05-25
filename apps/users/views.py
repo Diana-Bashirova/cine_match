@@ -4,9 +4,9 @@ from rest_framework.response import Response
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def history_list(request):
+def get_profile(request):
+    profile = request.user.profile
     return Response({
-        "status": "ok",
-        "message": "Функционал истории просмотров находится в разработке",
-        "data": []
+        'username': request.user.username,
+        'preference_vector': profile.preference_vector or {}
     })
