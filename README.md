@@ -119,13 +119,13 @@ cine_match/
 ##  Решение проблем
 
 ### Приложение не запускается
-  ash
+  Bash
 docker-compose down
 docker-compose up --build
   
 
 ### База данных не загружается
-  ash
+  Bash
 docker volume rm cine_match_sqlite_db
 docker-compose up --build
   
