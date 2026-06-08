@@ -66,7 +66,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        # 🔽 Используем путь из переменной окружения DB_PATH или дефолтный
+        'NAME': os.environ.get('DB_PATH', str(BASE_DIR / 'db.sqlite3')),
+        'OPTIONS': {
+            'timeout': 30,  # Увеличенный таймаут для больших запросов
+        },
     }
 }
 

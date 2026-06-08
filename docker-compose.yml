@@ -1,18 +1,46 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cine_match_web
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      # Исходный код проекта монтируется из папки на компьютере
+      - .:/app
+      # 🔽 БАЗА ДАННЫХ: именованный том монтируется в ОТДЕЛЬНУЮ папку (не файл!)
+      - sqlite_db:/app/db_data
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings
-      - DJANGO_DEBUG=True
-      - DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost,web
-    volumes:
-      - .:/app
-      - ./db.sqlite3:/app/db.sqlite3
-    command: >
-      sh -c "python manage.py migrate &&
-             python seed_full_dataset.py &&
-             python manage.py runserver 0.0.0.0:8000"
+      - PYTHONUNBUFFERED=1
+      # 🔽 Явный путь к файлу БД внутри контейнера (обходит проблемы с монтированием)
+      - DB_PATH=/app/db_data/db.sqlite3
+    # DNS для стабильного доступа к внешним API
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    networks:
+      - cine_match_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Собственная сеть для изоляции проекта
+networks:
+  cine_match_network:
+    driver: bridge
+    name: cine_match_network
+
+# Именованный том для SQLite (хранится внутри Docker, не в папке проекта)
+volumes:
+  sqlite_db:
+    name: cine_match_sqlite_db
+    driver: local

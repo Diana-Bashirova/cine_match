@@ -1,7 +1,7 @@
 from django.db import models
 
 class Movie(models.Model):
-    tmdb_id = models.IntegerField(unique=True, db_index=True)
+    tmdb_id = models.CharField(max_length=50, null=True, blank=True)
     title = models.CharField(max_length=255)
     release_year = models.IntegerField(null=True, blank=True)
     genres = models.JSONField(default=list)

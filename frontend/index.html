@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineMatch - Совместный подбор фильмов</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        h1 { color: #667eea; margin-bottom: 10px; text-align: center; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .screen { display: none; } .screen.active { display: block; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; }
+        input, select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; }
+        input:focus, select:focus { outline: none; border-color: #667eea; }
+        button { background: #667eea; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; transition: transform 0.2s, background 0.3s; }
+        button:hover { background: #5568d3; transform: translateY(-2px); }
+        button.secondary { background: #e0e0e0; color: #333; margin-top: 10px; }
+        button.secondary:hover { background: #d0d0d0; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        button.danger { background: #f44336; } button.danger:hover { background: #d32f2f; }
+        .error { background: #fee; color: #c00; padding: 12px; border-radius: 8px; margin-bottom: 20px; display: none; }
+        .error.show { display: block; }
+        .success { background: #efe; color: #080; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+        .movie-card, .room-card { background: #f9f9f9; border-radius: 8px; padding: 20px; margin-bottom: 15px; border-left: 4px solid #667eea; position: relative; }
+        .movie-card.watched { border-left-color: #4caf50; opacity: 0.7; }
+        .movie-card.liked { border-left-color: #4caf50 !important; }
+        .movie-card.disliked { border-left-color: #f44336 !important; }
+        .movie-card h3 { color: #333; margin-bottom: 8px; }
+        .movie-meta { color: #666; font-size: 14px; margin-bottom: 12px; }
+        .movie-meta span { margin-right: 15px; display: inline-block; }
+        .vote-buttons, .room-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        .vote-buttons button, .room-actions button { flex: 1; padding: 8px; font-size: 14px; }
+        .vote-buttons button.like { background: #4caf50; } .vote-buttons button.dislike { background: #f44336; }
+        .action-buttons { display: flex; gap: 8px; margin-top: 12px; }
+        .action-buttons button, .action-buttons select { flex: 1; padding: 8px; font-size: 13px; }
+        .action-buttons button.watch-btn { background: #2196f3; }
+        .recommendation-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; padding: 20px; margin-bottom: 15px; }
+        .recommendation-card h3 { margin-bottom: 8px; }
+        .score { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 14px; margin-bottom: 10px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #e0e0e0; }
+        .user-info { color: #666; }
+        .logout-btn { background: #f44336; padding: 8px 16px; font-size: 14px; width: auto; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .genre-tag { display: inline-block; background: #e0e0ff; color: #667eea; padding: 4px 12px; border-radius: 20px; font-size: 14px; margin-right: 8px; margin-bottom: 8px; }
+        #genre-checkboxes { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+        #genre-checkboxes label { font-weight: 400; cursor: pointer; }
+        .filter-section { background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .mood-label { font-size: 14px; color: #555; margin-bottom: 6px; display: block; }
+        .room-members { margin-top: 10px; font-size: 14px; color: #666; }
+        .invite-link { background: #e8f4fd; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 13px; margin: 10px 0; word-break: break-all; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #333; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 1000; animation: slideIn 0.3s ease; }
+        .toast.show { display: block; } .toast.success { background: #4caf50; } .toast.error { background: #f44336; }
+        .rating-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-left: 10px; margin-top: 8px; }
+        .rating-badge.like { background: #4caf50; color: white; }
+        .rating-badge.dislike { background: #f44336; color: white; }
+        .stats-box { background: #f0f4ff; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #555; }
+        .stats-box strong { color: #667eea; }
+        .stats-box .liked-genres { color: #4caf50; font-weight: 600; }
+        .stats-box .disliked-genres { color: #f44336; font-weight: 600; }
+        .room-settings-banner {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .room-settings-banner strong { color: #664d03; }
+        .room-settings-banner .emoji-big { font-size: 20px; }
+        .room-settings-banner .participants-details {
+            font-size: 12px;
+            margin-top: 5px;
+            opacity: 0.85;
+            line-height: 1.6;
+        }
+        #mood-genres-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .mood-genre-checkbox {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+            user-select: none;
+        }
+        .mood-genre-checkbox:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        .mood-genre-checkbox input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .mood-genre-checkbox.checked {
+            background: #e0e0ff;
+            border-color: #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+        .mood-genre-checkbox .emoji {
+            margin-right: 6px;
+            font-size: 16px;
+        }
+        .genres-detail {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .genres-detail-title {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: inherit;
+            opacity: 0.9;
+        }
+        .genre-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            margin: 2px 4px 2px 0;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .genre-chip.matched {
+            background: #4caf50;
+            color: white;
+            box-shadow: 0 2px 4px rgba(76,175,80,0.3);
+        }
+        .genre-chip.not-matched {
+            background: rgba(0,0,0,0.15);
+            color: rgba(255,255,255,0.6);
+            text-decoration: line-through;
+        }
+        .genre-chip.personal-matched {
+            background: #2196f3;
+            color: white;
+            box-shadow: 0 2px 4px rgba(33,150,243,0.3);
+        }
+        .genre-chip.personal-not-matched {
+            background: rgba(0,0,0,0.15);
+            color: rgba(255,255,255,0.6);
+        }
+        .genre-chip-light.matched {
+            background: #4caf50;
+            color: white;
+        }
+        .genre-chip-light.not-matched {
+            background: #e0e0e0;
+            color: #999;
+        }
+        .genre-chip-light.personal-matched {
+            background: #2196f3;
+            color: white;
+        }
+        .genre-chip-light.personal-not-matched {
+            background: #e0e0e0;
+            color: #999;
+        }
+        .genres-detail-light {
+            background: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .genres-detail-light .genres-detail-title {
+            color: #555;
+        }
+        .genres-count {
+            font-size: 11px;
+            opacity: 0.85;
+            margin-top: 6px;
+            font-style: italic;
+        }
+        .room-select-section {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .room-select-section h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .room-select-item {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .room-select-item:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+            transform: translateY(-1px);
+        }
+        .room-select-item .room-info {
+            flex: 1;
+        }
+        .room-select-item .room-info h4 {
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .room-select-item .room-info .room-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .room-select-item .room-select-btn {
+            background: #667eea;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            width: auto;
+            margin: 0;
+        }
+        .room-select-item .room-select-btn:hover {
+            background: #5568d3;
+        }
+        .vote-history-section {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .vote-history-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .vote-history-stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .vote-stat-badge {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .vote-stat-badge.likes { background: #e8f5e9; color: #2e7d32; border-color: #4caf50; }
+        .vote-stat-badge.dislikes { background: #ffebee; color: #c62828; border-color: #f44336; }
+        .vote-stat-badge.skips { background: #f5f5f5; color: #616161; border-color: #9e9e9e; }
+        .vote-stat-badge.total { background: #e3f2fd; color: #1565c0; border-color: #2196f3; }
+        .vote-history-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .vote-history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            gap: 10px;
+        }
+        .vote-history-item-header h4 {
+            color: #333;
+            font-size: 14px;
+            margin: 0;
+            flex: 1;
+        }
+        .vote-summary {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .vote-summary-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .vote-summary-item.likes { background: #e8f5e9; color: #2e7d32; }
+        .vote-summary-item.dislikes { background: #ffebee; color: #c62828; }
+        .vote-summary-item.skips { background: #f5f5f5; color: #616161; }
+        .vote-history-meta {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .vote-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .vote-user-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .vote-user-badge.like { background: #4caf50; color: white; }
+        .vote-user-badge.dislike { background: #f44336; color: white; }
+        .vote-user-badge.skip { background: #9e9e9e; color: white; }
+        .vote-user-badge.current-user { 
+            outline: 2px solid #667eea;
+            outline-offset: 1px;
+        }
+        .vote-reset-btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: auto;
+            width: auto;
+        }
+        .vote-reset-btn:hover {
+            background: #f57c00;
+        }
+        .vote-history-empty {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            font-size: 14px;
+        }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @media (max-width: 600px) { .container { padding: 20px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="login-screen" class="screen active">
+            <h1>CineMatch</h1><p class="subtitle">Совместный подбор фильмов с друзьями</p>
+            <div id="login-error" class="error"></div>
+            <div class="form-group"><label>Логин</label><input type="text" id="username" value="admin"></div>
+            <div class="form-group"><label>Пароль</label><input type="password" id="password" value="admin123"></div>
+            <button onclick="login()">Войти</button>
+            <button class="secondary" onclick="showScreen('register-screen')">Регистрация</button>
+        </div>
+        <div id="register-screen" class="screen">
+            <div class="header"><h1>Регистрация</h1><button class="logout-btn" onclick="showScreen('login-screen')">Назад</button></div>
+            <div id="register-error" class="error"></div><div id="register-success" class="success" style="display:none;"></div>
+            <div class="form-group"><label>Логин</label><input type="text" id="reg-username"></div>
+            <div class="form-group"><label>Пароль</label><input type="password" id="reg-password"></div>
+            <div class="form-group"><label>Повторите пароль</label><input type="password" id="reg-password2"></div>
+            <button onclick="register()">Зарегистрироваться</button>
+        </div>
+        <div id="dashboard-screen" class="screen">
+            <div class="header"><div><h1>CineMatch</h1><div class="user-info">Пользователь: <span id="user-name">user</span></div></div><button class="logout-btn" onclick="logout()">Выйти</button></div>
+            <div id="profile-section">
+                <h2>Мои предпочтения</h2><div id="user-genres" style="margin:15px 0;"></div>
+                <button class="secondary" onclick="toggleGenreSelector()">Настроить жанры</button>
+                <div id="genre-selector" style="display:none;margin-top:15px;background:#f9f9f9;padding:15px;border-radius:8px;">
+                    <p style="margin-bottom:10px;font-size:14px;color:#666;">Отметьте любимые жанры:</p><div id="genre-checkboxes"></div>
+                    <div style="display:flex;gap:10px;margin-top:15px;"><button onclick="saveGenres()" style="width:auto;">Сохранить</button><button class="secondary" onclick="toggleGenreSelector()" style="width:auto;">Отмена</button></div>
+                </div>
+            </div><hr style="margin:30px 0;border:none;border-top:2px solid #e0e0e0;">
+            <div><h2>Мои комнаты</h2><div id="rooms-list" style="margin:15px 0;"></div><button onclick="showScreen('room-screen')">Создать комнату</button></div><hr style="margin:30px 0;border:none;border-top:2px solid #e0e0e0;">
+            <div>
+                <h2>Рекомендации</h2>
+                <p style="color:#666;margin:15px 0;">Выберите способ получения рекомендаций:</p>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button onclick="getPersonalRecommendations()" style="flex:1;min-width:200px;">🎯 Персональные (умные)</button>
+                    <button onclick="getRoomRecommendations()" class="secondary" style="flex:1;min-width:200px;">👥 Через комнату (совместные)</button>
+                </div>
+            </div><hr style="margin:30px 0;border:none;border-top:2px solid #e0e0e0;">
+            <div>
+                <h2>Мои оценки</h2>
+                <p style="color:#666;margin:15px 0;">Управляйте своими оценками фильмов</p>
+                <button onclick="loadMyRatings(); showScreen('ratings-screen')">Открыть мои оценки</button>
+            </div><hr style="margin:30px 0;border:none;border-top:2px solid #e0e0e0;">
+            <div>
+                <h2>История просмотров</h2>
+                <p style="color:#666;margin:15px 0;">Просмотрите и управляйте историей просмотров</p>
+                <button onclick="loadViewingHistory(); showScreen('history-screen')">Открыть историю просмотров</button>
+            </div>
+        </div>
+        <div id="room-screen" class="screen">
+            <div class="header"><h1>Комната</h1><button class="logout-btn" onclick="showScreen('dashboard-screen')">Назад</button></div>
+            <div id="room-error" class="error"></div><div id="room-success" class="success" style="display:none;"></div>
+            
+            <div id="room-select-section" class="room-select-section">
+                <h3>📋 Выберите комнату для голосования</h3>
+                <div id="rooms-list-in-room" style="margin:10px 0;">
+                    <p style="color:#999;">Загрузка комнат...</p>
+                </div>
+                <button onclick="showCreateRoomSection()" style="margin-top:15px;background:#4caf50;">➕ Создать новую комнату</button>
+            </div>
+            
+            <div id="create-room-section" style="display:none;">
+                <div style="margin-bottom:15px;">
+                    <button onclick="showRoomSelectSection()" class="secondary" style="width:auto;">← Назад к списку</button>
+                </div>
+                <div class="form-group"><label>Код комнаты (необязательно)</label><input type="text" id="room-code" placeholder="Оставьте пустым для автогенерации"></div>
+                <button onclick="createRoom()">Создать комнату</button>
+            </div>
+            
+            <div id="manage-room-section" style="display:none;">
+                <h3 id="current-room-title"></h3><p><strong>Ссылка для приглашения:</strong></p><div class="invite-link" id="invite-link"></div><button onclick="copyInviteLink()" style="margin-bottom:15px;">Копировать ссылку</button>
+                <div class="room-members" id="room-members"></div>
+                <div class="room-actions" style="margin-top:15px;">
+                    <button class="secondary" onclick="enterRoomVoting()">Перейти к голосованию</button>
+                    <button class="secondary" onclick="toggleVoteHistory()" style="background:#e3f2fd;color:#1565c0;">📊 История голосов</button>
+                    <button id="leave-room-btn" class="secondary" onclick="leaveRoom()" style="display:none;">Покинуть комнату</button>
+                    <button id="delete-room-btn" class="danger" onclick="deleteRoom()" style="display:none;">🗑 Удалить комнату</button>
+                    <button class="secondary" onclick="backToRoomSelect()" style="flex:0.5;">← Назад к списку</button>
+                </div>
+                
+                <div id="vote-history-section" class="vote-history-section" style="display:none;">
+                    <h3>📊 История голосов комнаты</h3>
+                    <div id="vote-history-stats" class="vote-history-stats"></div>
+                    <div id="vote-history-list">
+                        <p class="vote-history-empty">Загрузка истории...</p>
+                    </div>
+                </div>
+            </div><hr style="margin:30px 0;"><h3>Присоединиться по ссылке</h3>
+            <div class="form-group"><label>Код приглашения</label><input type="text" id="invite-input" placeholder="Вставьте код из ссылки"></div>
+            <button onclick="joinByInvite()">Присоединиться</button>
+        </div>
+        <div id="voting-screen" class="screen">
+            <div class="header"><h1>Голосование</h1><button class="logout-btn" onclick="showScreen('dashboard-screen')">Назад</button></div>
+            <div id="room-combined-banner" class="room-settings-banner" style="display:none;">
+                <span class="emoji-big">👥</span>
+                <div style="flex:1;">
+                    <div id="room-combined-text" style="font-weight:600;">Загрузка настроек...</div>
+                    <div id="room-participants-details" class="participants-details"></div>
+                </div>
+            </div>
+            <div class="filter-section">
+                <h3 style="margin-bottom:10px;">🎭 Ваши предпочтения на сегодня</h3>
+                <p style="font-size:12px;color:#666;margin-bottom:15px;">ℹ️ Выберите несколько жанров, которые вам интересны. Система объединит ваши предпочтения с предпочтениями других участников.</p>
+                <div id="mood-genres-grid"></div>
+                <div style="margin-top:15px;">
+                    <label class="mood-label" for="filter-duration">Макс. длительность (мин, необязательно)</label>
+                    <input type="number" id="filter-duration" placeholder="Например: 180" min="60" max="300" onchange="onMySettingsChanged()">
+                </div>
+                <div style="display:flex;gap:10px;margin-top:15px;">
+                    <button onclick="saveMySettings()" style="flex:1;">💾 Сохранить мои предпочтения</button>
+                    <button onclick="clearMySettings()" class="secondary" style="flex:0.5;">🗑 Очистить</button>
+                </div>
+            </div>
+            <div id="movies-list" class="loading">Загрузка фильмов...</div>
+            <button class="secondary" onclick="getRecommendations()" style="margin-top:20px;">🎯 Получить рекомендации</button>
+        </div>
+        <div id="recommendations-screen" class="screen"><div class="header"><h1>Топ-10 рекомендаций</h1><button class="logout-btn" onclick="showScreen('dashboard-screen')">Назад</button></div><div id="recommendations-list" class="loading">Расчёт рекомендаций...</div><button class="secondary" onclick="showScreen('dashboard-screen')" style="margin-top:20px;">На главную</button></div>
+        <div id="ratings-screen" class="screen"><div class="header"><h1>Мои оценки</h1><button class="logout-btn" onclick="showScreen('dashboard-screen')">Назад</button></div><div id="ratings-list" class="loading">Загрузка оценок...</div></div>
+        <div id="history-screen" class="screen"><div class="header"><h1>История просмотров</h1><button class="logout-btn" onclick="showScreen('dashboard-screen')">Назад</button></div><div id="history-list" class="loading">Загрузка истории...</div></div>
+    </div>
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000/api';
+        let authToken = sessionStorage.getItem('authToken');
+        let currentRoomId = null;
+        let isRoomCreator = false;
+        let personalGenresCache = null;
+        let currentUserId = null;
+        
+        const AVAILABLE_GENRES = [
+            'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime', 
+            'Documentary', 'Drama', 'Family', 'Fantasy', 'Film-Noir', 'Game-Show', 
+            'History', 'Horror', 'Music', 'Musical', 'Mystery', 'News', 
+            'Reality-Tv', 'Romance', 'Sci-Fi', 'Sport', 'Talk-Show', 
+            'Thriller', 'War', 'Western'
+        ];
+
+        const GENRE_EMOJIS = {
+            'Action': '🔥', 'Adventure': '🗺️', 'Animation': '🎨', 'Biography': '📖',
+            'Comedy': '😄', 'Crime': '🔪', 'Documentary': '🎥', 'Drama': '🎭',
+            'Family': '👨‍👩‍👧', 'Fantasy': '🧙', 'Film-Noir': '🕵️', 'Game-Show': '🎮',
+            'History': '🏛️', 'Horror': '👻', 'Music': '🎵', 'Musical': '💃',
+            'Mystery': '🔍', 'News': '📰', 'Reality-Tv': '📺', 'Romance': '💕',
+            'Sci-Fi': '🚀', 'Sport': '⚽', 'Talk-Show': '🎤', 'Thriller': '😱',
+            'War': '⚔️', 'Western': '🤠'
+        };
+
+        let myRoomSettings = { mood_genres: [], max_duration: null };
+        let combinedRoomSettings = { combined_genres: [], combined_max_duration: null, participants: [] };
+
+        async function loadCurrentUserId() {
+            if (currentUserId) return currentUserId;
+            try {
+                const data = await safeFetch(API_BASE + '/users/me/');
+                currentUserId = data.id;
+                console.log('[USER ID] Загружен ID пользователя:', currentUserId);
+                return currentUserId;
+            } catch (e) {
+                console.error('[USER ID] Ошибка загрузки ID:', e);
+                return null;
+            }
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            if (screenId === 'voting-screen' && currentRoomId) {
+                initMoodGenresGrid();
+                loadRoomData();
+            }
+            if (screenId === 'room-screen' && !currentRoomId) {
+                showRoomSelectSection();
+            }
+        }
+
+        function showError(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 5000);
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function getAuthHeaders() {
+            if (!authToken || typeof authToken !== 'string') {
+                throw new Error('Сессия истекла или токен повреждён. Войдите в систему заново.');
+            }
+            return { 'Authorization': 'Bearer ' + authToken.trim() };
+        }
+
+        function normalizeRatings(ratingsObj) {
+            const normalized = {};
+            if (!ratingsObj || typeof ratingsObj !== 'object') return normalized;
+            for (const [key, val] of Object.entries(ratingsObj)) {
+                normalized[String(key)] = Number(val);
+            }
+            return normalized;
+        }
+
+        async function safeFetch(url, options = {}) {
+            if (!options.headers) options.headers = {};
+            if (url.includes('/api/') && !url.includes('/token/') && !url.includes('/register/')) {
+                try {
+                    const auth = getAuthHeaders();
+                    options.headers['Authorization'] = auth.Authorization;
+                } catch (e) { 
+                    if (e.message.includes('Сессия истекла')) {
+                        showToast('Сессия истекла. Перезагрузка...', 'error');
+                        setTimeout(() => {
+                            sessionStorage.clear();
+                            window.location.reload();
+                        }, 1500);
+                    }
+                    throw e; 
+                }
+            }
+            if (options.body && !options.headers['Content-Type']) {
+                options.headers['Content-Type'] = 'application/json';
+            }
+
+            try {
+                const res = await fetch(url, options);
+                if (res.status === 204) return null;
+                const ct = res.headers.get('content-type') || '';
+                if (!ct.includes('application/json')) {
+                    const text = await res.text();
+                    throw new Error(`Сервер вернул не JSON (${res.status}): ${text.substring(0, 150)}...`);
+                }
+                const data = await res.json();
+                if (!res.ok) {
+                    if (data.code === 'token_not_valid' || (data.detail && data.detail.includes('токен'))) {
+                        showToast('Сессия истекла. Перезагрузка...', 'error');
+                        setTimeout(() => {
+                            sessionStorage.clear();
+                            window.location.reload();
+                        }, 1500);
+                        throw new Error('Сессия истекла');
+                    }
+                    throw new Error(data.error || data.detail || `Ошибка сервера: ${res.status}`);
+                }
+                return data;
+            } catch (err) {
+                if (err.name === 'TypeError' && err.message.includes('fetch')) {
+                    throw new Error('Не удалось соединиться с бэкендом. Проверьте, запущен ли Docker.');
+                }
+                throw err;
+            }
+        }
+
+        async function login() {
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value.trim();
+            if (!u || !p) { showError('login-error', 'Введите логин и пароль'); return; }
+            try {
+                const res = await fetch(API_BASE + '/token/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const ct = res.headers.get('content-type') || '';
+                if (!ct.includes('application/json')) throw new Error('Сервер вернул не JSON');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || data.error || 'Ошибка входа');
+                authToken = String(data.access).trim();
+                sessionStorage.setItem('authToken', authToken);
+                showScreen('dashboard-screen');
+                await loadCurrentUserId();
+                loadProfile();
+                loadRooms();
+                checkInviteFromUrl();
+            } catch (e) {
+                console.error('[LOGIN] Ошибка:', e);
+                showError('login-error', e.message);
+            }
+        }
+
+        async function register() {
+            const u = document.getElementById('reg-username').value.trim();
+            const p = document.getElementById('reg-password').value;
+            const p2 = document.getElementById('reg-password2').value;
+            if (!u || !p) { showError('register-error', 'Заполните все поля'); return; }
+            if (u.length < 3) { showError('register-error', 'Минимум 3 символа'); return; }
+            if (p !== p2) { showError('register-error', 'Пароли не совпадают'); return; }
+            if (p.length < 8) { showError('register-error', 'Минимум 8 символов'); return; }
+            try {
+                await safeFetch(API_BASE + '/users/register/', {
+                    method: 'POST', body: JSON.stringify({ username: u, password: p })
+                });
+                document.getElementById('register-success').textContent = 'Регистрация успешна! Выполняется вход...';
+                document.getElementById('register-success').style.display = 'block';
+                const data = await safeFetch(API_BASE + '/token/', {
+                    method: 'POST', body: JSON.stringify({ username: u, password: p })
+                });
+                authToken = String(data.access).trim();
+                sessionStorage.setItem('authToken', authToken);
+                showScreen('dashboard-screen');
+                await loadCurrentUserId();
+                loadProfile();
+                loadRooms();
+            } catch (e) { showError('register-error', e.message); }
+        }
+
+        function logout() {
+            authToken = null;
+            sessionStorage.clear();
+            currentRoomId = null;
+            personalGenresCache = null;
+            currentUserId = null;
+            showScreen('login-screen');
+        }
+
+        async function loadProfile() {
+            try {
+                const data = await safeFetch(API_BASE + '/users/me/');
+                document.getElementById('user-name').textContent = data.username;
+                const prefs = data.preference_vector?.genres || [];
+                sessionStorage.setItem('currentUserGenres', JSON.stringify(prefs));
+                const div = document.getElementById('user-genres');
+                div.innerHTML = prefs.length 
+                    ? prefs.map(g => '<span class="genre-tag">' + g + '</span>').join('')
+                    : '<p style="color:#999;">Предпочтения не установлены. Нажмите "Настроить жанры".</p>';
+            } catch (e) { console.error('Profile error:', e); }
+        }
+
+        function toggleGenreSelector() {
+            const el = document.getElementById('genre-selector');
+            const isVisible = el.style.display === 'block';
+            el.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) {
+                const container = document.getElementById('genre-checkboxes');
+                container.innerHTML = '';
+                const current = JSON.parse(sessionStorage.getItem('currentUserGenres') || '[]');
+                AVAILABLE_GENRES.forEach(genre => {
+                    const label = document.createElement('label');
+                    label.innerHTML = '<input type="checkbox" value="' + genre + '" ' + (current.includes(genre) ? 'checked' : '') + ' style="margin-right:5px;"> ' + genre;
+                    container.appendChild(label);
+                });
+            }
+        }
+
+        async function saveGenres() {
+            const checkboxes = document.querySelectorAll('#genre-checkboxes input:checked');
+            const selected = Array.from(checkboxes).map(cb => cb.value);
+            try {
+                await safeFetch(API_BASE + '/users/me/preferences/', {
+                    method: 'PATCH', body: JSON.stringify({ genres: selected })
+                });
+                sessionStorage.setItem('currentUserGenres', JSON.stringify(selected));
+                toggleGenreSelector();
+                loadProfile();
+                showToast('Предпочтения сохранены');
+            } catch (e) {
+                if (e.message.includes('Сессия истекла') || e.message.includes('Токен отсутствует')) {
+                    showError('login-error', e.message);
+                    showScreen('login-screen');
+                } else { showToast(e.message, 'error'); }
+            }
+        }
+
+        async function getAllUserRooms() {
+            try {
+                const createdRooms = await safeFetch(API_BASE + '/rooms/');
+                const memberRooms = await safeFetch(API_BASE + '/rooms/my-rooms/').catch(() => []);
+                
+                const allRooms = [...(Array.isArray(createdRooms) ? createdRooms : [])];
+                (Array.isArray(memberRooms) ? memberRooms : []).forEach(room => {
+                    if (!allRooms.find(r => r.id === room.id)) {
+                        allRooms.push(room);
+                    }
+                });
+                
+                return allRooms;
+            } catch (e) {
+                console.error('Ошибка загрузки комнат:', e);
+                return [];
+            }
+        }
+
+        async function loadRooms() {
+            try {
+                const allRooms = await getAllUserRooms();
+                
+                const div = document.getElementById('rooms-list');
+                div.innerHTML = allRooms.length 
+                    ? allRooms.map(r => {
+                        const settingsText = [];
+                        if (r.combined_genres && r.combined_genres.length > 0) {
+                            settingsText.push('🎭 ' + r.combined_genres.join(', '));
+                        }
+                        if (r.combined_max_duration) {
+                            settingsText.push('⏱️ до ' + r.combined_max_duration + ' мин');
+                        }
+                        const settingsBadge = settingsText.length > 0 
+                            ? '<div style="font-size:12px;color:#667eea;margin-top:5px;">⚙️ ' + settingsText.join(' | ') + '</div>'
+                            : '';
+                        const creatorBadge = r.is_creator ? ' 👑' : '';
+                        return '<div class="room-card"><h3>Комната: ' + r.code + creatorBadge + '</h3><p style="color:#666;font-size:14px;">Участников: ' + r.member_count + '</p>' + settingsBadge + '<div class="room-actions"><button class="secondary" onclick="manageRoom(' + r.id + ',\'' + r.code + '\',' + Boolean(r.is_creator) + ',\'' + (r.invite_link || '') + '\')">Управление</button><button onclick="enterRoomVoting(' + r.id + ')">Голосование</button></div></div>';
+                      }).join('')
+                    : '<p style="color:#999;">У вас нет комнат.</p>';
+            } catch (e) { console.error('Rooms load error:', e); }
+        }
+
+        async function showRoomSelectSection() {
+            const selectSection = document.getElementById('room-select-section');
+            const createSection = document.getElementById('create-room-section');
+            const manageSection = document.getElementById('manage-room-section');
+            const roomsListDiv = document.getElementById('rooms-list-in-room');
+            
+            selectSection.style.display = 'block';
+            createSection.style.display = 'none';
+            manageSection.style.display = 'none';
+            
+            roomsListDiv.innerHTML = '<p style="color:#999;">Загрузка комнат...</p>';
+            
+            try {
+                const allRooms = await getAllUserRooms();
+                
+                if (allRooms.length === 0) {
+                    roomsListDiv.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">У вас пока нет комнат.<br>Создайте новую или присоединитесь по ссылке ниже.</p>';
+                    return;
+                }
+                
+                roomsListDiv.innerHTML = allRooms.map(r => {
+                    const settingsText = [];
+                    if (r.combined_genres && r.combined_genres.length > 0) {
+                        settingsText.push('🎭 ' + r.combined_genres.join(', '));
+                    }
+                    if (r.combined_max_duration) {
+                        settingsText.push('⏱️ до ' + r.combined_max_duration + ' мин');
+                    }
+                    const metaText = 'Участников: ' + r.member_count + (settingsText.length > 0 ? ' | ' + settingsText.join(' | ') : '');
+                    const creatorBadge = r.is_creator ? ' 👑' : '';
+                    
+                    return '<div class="room-select-item" onclick="selectRoomForVoting(' + r.id + ',\'' + r.code.replace(/'/g, "\\'") + '\',' + Boolean(r.is_creator) + ',\'' + (r.invite_link || '').replace(/'/g, "\\'") + '\')">' +
+                        '<div class="room-info">' +
+                            '<h4>' + r.code + creatorBadge + '</h4>' +
+                            '<div class="room-meta">' + metaText + '</div>' +
+                        '</div>' +
+                        '<button class="room-select-btn" onclick="event.stopPropagation(); selectRoomForVoting(' + r.id + ',\'' + r.code.replace(/'/g, "\\'") + '\',' + Boolean(r.is_creator) + ',\'' + (r.invite_link || '').replace(/'/g, "\\'") + '\')">Выбрать →</button>' +
+                    '</div>';
+                }).join('');
+            } catch (e) {
+                roomsListDiv.innerHTML = '<p style="color:#c00;">Ошибка загрузки комнат: ' + e.message + '</p>';
+            }
+        }
+
+        function showCreateRoomSection() {
+            const selectSection = document.getElementById('room-select-section');
+            const createSection = document.getElementById('create-room-section');
+            const manageSection = document.getElementById('manage-room-section');
+            
+            selectSection.style.display = 'none';
+            createSection.style.display = 'block';
+            manageSection.style.display = 'none';
+        }
+
+        function selectRoomForVoting(id, code, isCreator, inviteLink) {
+            manageRoom(id, code, isCreator, inviteLink);
+        }
+
+        function backToRoomSelect() {
+            currentRoomId = null;
+            showRoomSelectSection();
+        }
+
+        async function createRoom() {
+            const code = document.getElementById('room-code').value.trim();
+            try {
+                const data = await safeFetch(API_BASE + '/rooms/create/', {
+                    method: 'POST', body: JSON.stringify({ code: code || undefined })
+                });
+                document.getElementById('room-success').textContent = 'Комната создана: ' + data.code;
+                document.getElementById('room-success').style.display = 'block';
+                showRoomSelectSection();
+                loadRooms();
+            } catch (e) { showError('room-error', e.message); }
+        }
+
+        function manageRoom(id, code, creator, link) {
+            currentRoomId = id;
+            isRoomCreator = Boolean(creator);
+            
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById('room-screen').classList.add('active');
+            
+            document.getElementById('room-select-section').style.display = 'none';
+            document.getElementById('create-room-section').style.display = 'none';
+            document.getElementById('manage-room-section').style.display = 'block';
+            document.getElementById('vote-history-section').style.display = 'none';
+            
+            document.getElementById('current-room-title').textContent = 'Комната: ' + code;
+            document.getElementById('invite-link').textContent = link || 'Генерация...';
+            document.getElementById('leave-room-btn').style.display = isRoomCreator ? 'none' : 'inline-block';
+            document.getElementById('delete-room-btn').style.display = isRoomCreator ? 'inline-block' : 'none';
+            loadRoomMembers(id);
+        }
+
+        async function loadRoomMembers(id) {
+            try {
+                const data = await safeFetch(API_BASE + '/rooms/' + id + '/members/');
+                const all = [data.creator, ...data.members.filter(m => m.id !== data.creator.id)].filter(m => m.username);
+                document.getElementById('room-members').innerHTML = '<strong>Участники:</strong> ' + all.map(m => m.username + (m.is_creator ? ' (создатель)' : '')).join(', ');
+            } catch (e) { console.error('Members error:', e); }
+        }
+
+        function copyInviteLink() {
+            const link = document.getElementById('invite-link').textContent;
+            if (link && link.includes('room=')) {
+                navigator.clipboard.writeText(link).then(() => showToast('Ссылка скопирована'));
+            } else { showToast('Ссылка ещё не сгенерирована', 'error'); }
+        }
+
+        async function joinByInvite() {
+            let code = document.getElementById('invite-input').value.trim();
+            if (!code) { showError('room-error', 'Введите код'); return; }
+            if (code.includes('?room=')) {
+                const match = code.match(/[?&]room=([^&]+)/);
+                if (match && match[1]) { code = match[1]; document.getElementById('invite-input').value = code; }
+            }
+            try {
+                const data = await safeFetch(API_BASE + '/rooms/join/', {
+                    method: 'POST', body: JSON.stringify({ invite_code: code })
+                });
+                showToast('Присоединились к ' + data.code);
+                loadRooms();
+                showRoomSelectSection();
+            } catch (e) { showError('room-error', e.message); }
+        }
+
+        async function leaveRoom() {
+            if (!currentRoomId || !confirm('Покинуть комнату?')) return;
+            try {
+                await safeFetch(API_BASE + '/rooms/' + currentRoomId + '/leave/', { method: 'POST' });
+                showToast('Вы покинули комнату');
+                currentRoomId = null;
+                loadRooms();
+                showRoomSelectSection();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function deleteRoom() {
+            if (!currentRoomId || !isRoomCreator) {
+                showToast('Только создатель может удалить комнату', 'error');
+                return;
+            }
+            const roomTitle = document.getElementById('current-room-title')?.textContent || 'эту комнату';
+            if (!confirm('⚠️ УДАЛЕНИЕ КОМНАТЫ\n\nВы уверены, что хотите удалить "' + roomTitle + '"?\n\nЭто действие необратимо:\n• Все голоса участников будут удалены\n• Ссылка-приглашение перестанет работать\n• Код комнаты будет освобождён\n\nПродолжить?')) return;
+            try {
+                const response = await fetch(API_BASE + '/rooms/' + currentRoomId + '/delete/', { 
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+                if (response.status === 204 || response.status === 200) {
+                    showToast('🗑 Комната удалена');
+                    currentRoomId = null;
+                    loadRooms();
+                    showRoomSelectSection();
+                } else {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || 'Ошибка сервера: ' + response.status);
+                }
+            } catch (e) { 
+                showToast('Ошибка удаления: ' + e.message, 'error');
+                console.error('Delete room error:', e);
+            }
+        }
+
+        function enterRoomVoting(id) {
+            if (id) currentRoomId = id;
+            if (!currentRoomId) { showToast('Выберите комнату', 'error'); return; }
+            showScreen('voting-screen');
+            initMoodGenresGrid();
+            loadRoomData();
+        }
+
+        function getRoomRecommendations() {
+            currentRoomId = null;
+            showScreen('room-screen');
+        }
+
+        function checkInviteFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('room');
+            if (code && authToken) {
+                document.getElementById('invite-input').value = code;
+                joinByInvite();
+            }
+        }
+
+        function initMoodGenresGrid() {
+            const grid = document.getElementById('mood-genres-grid');
+            if (!grid) return;
+            
+            grid.innerHTML = AVAILABLE_GENRES.map(genre => {
+                const emoji = GENRE_EMOJIS[genre] || '🎬';
+                return '<label class="mood-genre-checkbox" data-genre="' + genre + '">' +
+                    '<input type="checkbox" value="' + genre + '" onchange="onGenreCheckboxChange(this)">' +
+                    '<span class="emoji">' + emoji + '</span>' +
+                    '<span>' + genre + '</span>' +
+                '</label>';
+            }).join('');
+        }
+
+        function onGenreCheckboxChange(checkbox) {
+            const label = checkbox.closest('.mood-genre-checkbox');
+            if (checkbox.checked) {
+                label.classList.add('checked');
+            } else {
+                label.classList.remove('checked');
+            }
+        }
+
+        function getSelectedMoodGenres() {
+            const checkboxes = document.querySelectorAll('#mood-genres-grid input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function setSelectedMoodGenres(genres) {
+            const checkboxes = document.querySelectorAll('#mood-genres-grid input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                const label = cb.closest('.mood-genre-checkbox');
+                if (genres && genres.includes(cb.value)) {
+                    cb.checked = true;
+                    label.classList.add('checked');
+                } else {
+                    cb.checked = false;
+                    label.classList.remove('checked');
+                }
+            });
+        }
+
+        async function loadMySettings() {
+            if (!currentRoomId) return;
+            try {
+                const settings = await safeFetch(API_BASE + '/rooms/' + currentRoomId + '/my-settings/');
+                myRoomSettings = settings;
+                setSelectedMoodGenres(settings.mood_genres || []);
+                document.getElementById('filter-duration').value = settings.max_duration || '';
+            } catch (e) {
+                console.warn('Не удалось загрузить мои настройки:', e);
+            }
+        }
+
+        async function loadCombinedSettings() {
+            if (!currentRoomId) return;
+            try {
+                const settings = await safeFetch(API_BASE + '/rooms/' + currentRoomId + '/combined-settings/');
+                combinedRoomSettings = settings;
+                updateCombinedBanner(settings);
+            } catch (e) {
+                console.warn('Не удалось загрузить объединённые настройки:', e);
+            }
+        }
+
+        function updateCombinedBanner(settings) {
+            const banner = document.getElementById('room-combined-banner');
+            const text = document.getElementById('room-combined-text');
+            const details = document.getElementById('room-participants-details');
+            
+            if (!banner || !text) return;
+            
+            const genres = settings.combined_genres || [];
+            const duration = settings.combined_max_duration;
+            
+            const genreText = genres.length > 0 
+                ? genres.map(g => (GENRE_EMOJIS[g] || '🎬') + ' ' + g).join(', ')
+                : '🎲 Любой жанр';
+            const durationText = duration ? '⏱️ до ' + duration + ' мин' : '⏱️ без ограничения';
+            
+            text.innerHTML = 'Общие критерии: ' + genreText + ' | ' + durationText;
+            
+            if (settings.participants && settings.participants.length > 0) {
+                details.innerHTML = '<strong style="font-size:11px;">Настройки участников:</strong><br>' + 
+                    settings.participants.map(p => {
+                        const pGenres = (p.mood_genres && p.mood_genres.length > 0) 
+                            ? p.mood_genres.map(g => GENRE_EMOJIS[g] || '🎬').join('') 
+                            : '🎲';
+                        const pDuration = p.max_duration ? p.max_duration + 'мин' : '∞';
+                        const creatorBadge = p.is_creator ? ' 👑' : '';
+                        return '<span style="margin-right:12px;">' + p.username + creatorBadge + ': ' + pGenres + ' ' + pDuration + '</span>';
+                    }).join('');
+            } else {
+                details.innerHTML = '';
+            }
+            
+            banner.style.display = 'flex';
+        }
+
+        async function loadRoomData() {
+            await Promise.all([
+                loadMySettings(),
+                loadCombinedSettings()
+            ]);
+            loadMovies();
+        }
+
+        async function saveMySettings() {
+            if (!currentRoomId) {
+                showToast('Сначала войдите в комнату', 'error');
+                return;
+            }
+            
+            const mood_genres = getSelectedMoodGenres();
+            const durationInput = document.getElementById('filter-duration');
+            const max_duration = durationInput.value ? parseInt(durationInput.value) : null;
+            
+            try {
+                const response = await safeFetch(API_BASE + '/rooms/' + currentRoomId + '/my-settings/update/', {
+                    method: 'POST',
+                    body: JSON.stringify({ mood_genres: mood_genres, max_duration: max_duration })
+                });
+                
+                myRoomSettings = response;
+                showToast('✅ Ваши предпочтения сохранены');
+                
+                await loadCombinedSettings();
+                loadMovies();
+            } catch (e) {
+                showToast('Ошибка сохранения: ' + e.message, 'error');
+            }
+        }
+
+        async function clearMySettings() {
+            if (!confirm('Очистить ваши предпочтения?')) return;
+            
+            try {
+                await safeFetch(API_BASE + '/rooms/' + currentRoomId + '/my-settings/update/', {
+                    method: 'POST',
+                    body: JSON.stringify({ mood_genres: [], max_duration: null })
+                });
+                
+                setSelectedMoodGenres([]);
+                document.getElementById('filter-duration').value = '';
+                myRoomSettings = { mood_genres: [], max_duration: null };
+                
+                showToast('🗑 Предпочтения очищены');
+                await loadCombinedSettings();
+                loadMovies();
+            } catch (e) {
+                showToast('Ошибка: ' + e.message, 'error');
+            }
+        }
+
+        function onMySettingsChanged() {
+            clearTimeout(window._settingsSaveTimeout);
+            window._settingsSaveTimeout = setTimeout(() => {
+                saveMySettings();
+            }, 1000);
+        }
+
+        async function toggleVoteHistory() {
+            const section = document.getElementById('vote-history-section');
+            if (section.style.display === 'none' || section.style.display === '') {
+                section.style.display = 'block';
+                await loadVoteHistory();
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        async function loadVoteHistory() {
+            if (!currentRoomId) return;
+            
+            const listDiv = document.getElementById('vote-history-list');
+            const statsDiv = document.getElementById('vote-history-stats');
+            listDiv.innerHTML = '<p class="vote-history-empty">Загрузка истории...</p>';
+            statsDiv.innerHTML = '';
+            
+            try {
+                const userId = await loadCurrentUserId();
+                console.log('[VOTE HISTORY] Текущий userId:', userId, 'тип:', typeof userId);
+                
+                const data = await safeFetch(API_BASE + '/rooms/' + currentRoomId + '/vote-history/');
+                
+                if (!data.history || data.history.length === 0) {
+                    listDiv.innerHTML = '<p class="vote-history-empty">📭 В этой комнате ещё никто не голосовал.<br>Перейдите к голосованию, чтобы начать!</p>';
+                    return;
+                }
+                
+                const stats = data.stats;
+                statsDiv.innerHTML = 
+                    '<div class="vote-stat-badge total">🎬 Фильмов: ' + stats.total_movies + '</div>' +
+                    '<div class="vote-stat-badge total">🗳️ Всего голосов: ' + stats.total_votes + '</div>' +
+                    '<div class="vote-stat-badge likes">👍 Нравится: ' + stats.total_likes + '</div>' +
+                    '<div class="vote-stat-badge dislikes">👎 Не нравится: ' + stats.total_dislikes + '</div>' +
+                    '<div class="vote-stat-badge skips">⏭️ Пропущено: ' + stats.total_skips + '</div>';
+                
+                listDiv.innerHTML = data.history.map(movie => {
+                    const currentUserVote = movie.votes.find(v => String(v.user_id) === String(userId));
+                    const hasCurrentUserVote = currentUserVote && Number(currentUserVote.vote) !== 0;
+                    
+                    console.log(`[VOTE HISTORY] Фильм: "${movie.movie_title}" (ID: ${movie.movie_id}), голос текущего пользователя:`, currentUserVote, 'имеет голос:', hasCurrentUserVote);
+                    
+                    const votesHtml = movie.votes.map(v => {
+                        const icon = v.vote_type === 'like' ? '👍' : (v.vote_type === 'dislike' ? '👎' : '⏭️');
+                        const dateStr = v.date ? new Date(v.date).toLocaleString('ru-RU', {
+                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                        }) : '';
+                        const isCurrentUser = String(v.user_id) === String(userId);
+                        const currentUserClass = isCurrentUser ? ' current-user' : '';
+                        const userLabel = isCurrentUser ? ' (вы)' : '';
+                        
+                        return '<span class="vote-user-badge ' + v.vote_type + currentUserClass + '" title="' + v.username + ' — ' + dateStr + '">' +
+                            icon + ' ' + v.username + userLabel +
+                        '</span>';
+                    }).join('');
+                    
+                    const metaParts = [];
+                    if (movie.movie_genres) metaParts.push('🎭 ' + movie.movie_genres);
+                    if (movie.movie_duration) metaParts.push('⏱️ ' + movie.movie_duration + ' мин');
+                    if (movie.movie_rating) metaParts.push('⭐ ' + movie.movie_rating);
+                    
+                    // 🔽 Кнопка "Сбросить" показывается ВСЕГДА для всех фильмов
+                    const resetButton = '<button class="vote-reset-btn" onclick="resetVote(' + movie.movie_id + ')">↺ Сбросить мою оценку</button>';
+                    
+                    return '<div class="vote-history-item">' +
+                        '<div class="vote-history-item-header">' +
+                            '<h4>' + movie.movie_title + '</h4>' +
+                            '<div class="vote-summary">' +
+                                (movie.likes_count > 0 ? '<span class="vote-summary-item likes">👍 ' + movie.likes_count + '</span>' : '') +
+                                (movie.dislikes_count > 0 ? '<span class="vote-summary-item dislikes">👎 ' + movie.dislikes_count + '</span>' : '') +
+                                (movie.skips_count > 0 ? '<span class="vote-summary-item skips">⏭️ ' + movie.skips_count + '</span>' : '') +
+                            '</div>' +
+                        '</div>' +
+                        (metaParts.length > 0 ? '<div class="vote-history-meta">' + metaParts.join(' | ') + '</div>' : '') +
+                        '<div class="vote-details">' + votesHtml + resetButton + '</div>' +
+                    '</div>';
+                }).join('');
+                
+            } catch (e) {
+                listDiv.innerHTML = '<p class="vote-history-empty" style="color:#c00;">Ошибка загрузки: ' + e.message + '</p>';
+                console.error('[VOTE HISTORY] Ошибка:', e);
+            }
+        }
+
+        // 🔽 ИСПРАВЛЕНО: resetVote теперь удаляет фильм из истории просмотров, чтобы он вернулся в рекомендации
+        async function resetVote(movieId) {
+            if (!currentRoomId) {
+                showToast('Выберите комнату', 'error');
+                return;
+            }
+            
+            if (!confirm('Сбросить вашу оценку за этот фильм?\n\n• Ваш голос в комнате будет удалён\n• Ваша оценка в "Мои оценки" будет удалена\n• Фильм будет удалён из истории просмотров\n• Фильм снова появится в рекомендациях')) {
+                return;
+            }
+            
+            console.log(`[RESET VOTE] Начало сброса для фильма ${movieId} в комнате ${currentRoomId}`);
+            
+            try {
+                // 1. Сброс голоса в комнате (vote = 0)
+                console.log(`[RESET VOTE] Шаг 1: Сброс голоса в комнате...`);
+                try {
+                    await safeFetch(API_BASE + '/rooms/' + currentRoomId + '/vote/', {
+                        method: 'POST',
+                        body: JSON.stringify({ movie_id: movieId, vote: 0 })
+                    });
+                    console.log(`[RESET VOTE] ✅ Голос в комнате сброшен`);
+                } catch (voteErr) {
+                    console.warn(`[RESET VOTE] ⚠️ Ошибка сброса голоса:`, voteErr);
+                }
+                
+                // 2. Удаление оценки из "Мои оценки"
+                console.log(`[RESET VOTE] Шаг 2: Удаление оценки из "Мои оценки"...`);
+                try {
+                    const deleteResponse = await fetch(API_BASE + '/history/ratings/' + movieId + '/', {
+                        method: 'DELETE',
+                        headers: getAuthHeaders()
+                    });
+                    console.log(`[RESET VOTE] Ответ удаления оценки: ${deleteResponse.status}`);
+                } catch (deleteErr) {
+                    console.warn(`[RESET VOTE] ⚠️ Ошибка удаления оценки:`, deleteErr);
+                }
+                
+                // 3. 🔽 НОВОЕ: Удаление из истории просмотров
+                console.log(`[RESET VOTE] Шаг 3: Удаление из истории просмотров...`);
+                try {
+                    const history = await safeFetch(API_BASE + '/history/');
+                    const historyEntry = history.find(h => String(h.movie) === String(movieId) || String(h.movie_id) === String(movieId));
+                    
+                    if (historyEntry) {
+                        const entryId = historyEntry.id;
+                        console.log(`[RESET VOTE] Найден фильм в истории, ID записи: ${entryId}`);
+                        await safeFetch(API_BASE + '/history/' + entryId + '/', {
+                            method: 'DELETE'
+                        });
+                        console.log(`[RESET VOTE] ✅ Фильм удалён из истории просмотров`);
+                    } else {
+                        console.log(`[RESET VOTE] ℹ️ Фильм не найден в истории просмотров`);
+                    }
+                } catch (histErr) {
+                    console.warn(`[RESET VOTE] ⚠️ Ошибка удаления из истории:`, histErr);
+                }
+                
+                // 4. Сброс кэша
+                personalGenresCache = null;
+                
+                showToast('✅ Оценка сброшена. Фильм снова доступен для голосования.');
+                
+                // 5. Обновление истории голосов
+                await loadVoteHistory();
+                
+                // 6. Обновление рекомендаций, если открыт экран голосования
+                if (document.getElementById('voting-screen').classList.contains('active')) {
+                    loadMovies();
+                }
+                
+                console.log(`[RESET VOTE] ✅ Сброс оценки завершён успешно`);
+                
+            } catch (e) {
+                console.error(`[RESET VOTE] ❌ Критическая ошибка:`, e);
+                showToast('Ошибка сброса: ' + e.message, 'error');
+            }
+        }
+
+        async function loadPersonalGenres() {
+            if (personalGenresCache) return personalGenresCache;
+            
+            try {
+                const rawRatings = await safeFetch(API_BASE + '/history/ratings/list/').catch(() => ({}));
+                const ratings = normalizeRatings(rawRatings);
+                
+                const likedMovieIds = Object.entries(ratings)
+                    .filter(([id, rating]) => rating >= 7)
+                    .map(([id, rating]) => id);
+                
+                if (likedMovieIds.length === 0) {
+                    personalGenresCache = [];
+                    return [];
+                }
+                
+                const allGenres = new Set();
+                await Promise.all(likedMovieIds.map(async (id) => {
+                    try {
+                        const movie = await safeFetch(API_BASE + '/movies/' + id + '/');
+                        if (movie && movie.genres) {
+                            const genres = Array.isArray(movie.genres) ? movie.genres : movie.genres.split(',');
+                            genres.forEach(g => allGenres.add(g.trim()));
+                        }
+                    } catch (e) { /* пропускаем */ }
+                }));
+                
+                personalGenresCache = Array.from(allGenres).sort();
+                return personalGenresCache;
+            } catch (e) {
+                console.warn('Не удалось загрузить персональные жанры:', e);
+                return [];
+            }
+        }
+
+        function renderGenresMatch(allGenres, movieGenres, isPersonal = false) {
+            if (!allGenres || allGenres.length === 0) return '';
+            
+            const movieGenresSet = new Set((movieGenres || []).map(g => g.trim()));
+            const matchedCount = allGenres.filter(g => movieGenresSet.has(g)).length;
+            
+            const chipsHtml = allGenres.map(genre => {
+                const isMatched = movieGenresSet.has(genre);
+                const emoji = GENRE_EMOJIS[genre] || '🎬';
+                const chipClass = isPersonal 
+                    ? (isMatched ? 'personal-matched' : 'personal-not-matched')
+                    : (isMatched ? 'matched' : 'not-matched');
+                
+                return '<span class="genre-chip ' + chipClass + '">' + emoji + ' ' + genre + '</span>';
+            }).join('');
+            
+            const title = isPersonal ? '💚 Персональные предпочтения (из лайков)' : '🎭 Критерии комнаты';
+            
+            return '<div class="genres-detail">' +
+                '<div class="genres-detail-title">' + title + ':</div>' +
+                '<div>' + chipsHtml + '</div>' +
+                '<div class="genres-count">Совпало: ' + matchedCount + ' из ' + allGenres.length + '</div>' +
+            '</div>';
+        }
+
+        function renderGenresMatchLight(allGenres, movieGenres, isPersonal = false) {
+            if (!allGenres || allGenres.length === 0) return '';
+            
+            const movieGenresSet = new Set((movieGenres || []).map(g => g.trim()));
+            const matchedCount = allGenres.filter(g => movieGenresSet.has(g)).length;
+            
+            const chipsHtml = allGenres.map(genre => {
+                const isMatched = movieGenresSet.has(genre);
+                const emoji = GENRE_EMOJIS[genre] || '🎬';
+                const chipClass = isPersonal 
+                    ? (isMatched ? 'personal-matched' : 'personal-not-matched')
+                    : (isMatched ? 'matched' : 'not-matched');
+                
+                return '<span class="genre-chip genre-chip-light ' + chipClass + '">' + emoji + ' ' + genre + '</span>';
+            }).join('');
+            
+            const title = isPersonal ? '💚 Персональные предпочтения (из лайков)' : '🎭 Критерии комнаты';
+            
+            return '<div class="genres-detail-light">' +
+                '<div class="genres-detail-title">' + title + ':</div>' +
+                '<div>' + chipsHtml + '</div>' +
+                '<div class="genres-count" style="color:#888;">Совпало: ' + matchedCount + ' из ' + allGenres.length + '</div>' +
+            '</div>';
+        }
+
+        async function loadMovies() {
+            const div = document.getElementById('movies-list');
+            div.innerHTML = '<div class="loading">🎯 Расчёт рекомендаций...</div>';
+            
+            if (!currentRoomId) {
+                div.innerHTML = '<div class="error show">Сначала войдите в комнату</div>';
+                return;
+            }
+            
+            try {
+                const [data, personalGenres] = await Promise.all([
+                    safeFetch(API_BASE + '/recommendations/consensus/', {
+                        method: 'POST', 
+                        body: JSON.stringify({ room_id: currentRoomId })
+                    }),
+                    loadPersonalGenres()
+                ]);
+                
+                if (!data || data.length === 0) {
+                    div.innerHTML = '<p style="color:#999;text-align:center;padding:40px;">' +
+                        'Нет рекомендаций.<br><br>' +
+                        'Попробуйте:<br>' +
+                        '• Расширить выбор жанров<br>' +
+                        '• Увеличить максимальную длительность<br>' +
+                        '• Очистить предпочтения</p>'; 
+                    return; 
+                }
+                
+                const roomGenres = combinedRoomSettings.combined_genres || [];
+                
+                div.innerHTML = data.map((rec, i) => {
+                    const movieId = String(rec.id);
+                    const movieGenres = Array.isArray(rec.genres) 
+                        ? rec.genres 
+                        : (rec.genres ? rec.genres.split(',').map(g => g.trim()) : []);
+                    const genresDisplay = movieGenres.join(', ') || 'N/A';
+                    
+                    const roomMatchHtml = renderGenresMatchLight(roomGenres, movieGenres, false);
+                    const personalMatchHtml = renderGenresMatchLight(personalGenres, movieGenres, true);
+                    
+                    return '<div class="movie-card" data-movie-id="' + movieId + '">' +
+                        '<h3>' + (i + 1) + '. ' + rec.title + '</h3>' +
+                        '<div class="score" style="margin:10px 0;background:#667eea;color:white;">🎯 Совпадение: ' + rec.score + '%</div>' +
+                        roomMatchHtml +
+                        personalMatchHtml +
+                        '<div class="movie-meta">' +
+                            '<span>Жанры фильма: ' + genresDisplay + '</span>' +
+                            '<span>Длительность: ' + (rec.duration ? rec.duration + ' мин' : 'N/A') + '</span>' +
+                            '<span>Рейтинг: ⭐ ' + (rec.imdb_rating || 'N/A') + '</span>' +
+                        '</div>' +
+                        '<div class="vote-buttons">' +
+                            '<button class="like" onclick="vote(' + movieId + ', 1)">👍 Нравится</button>' +
+                            '<button class="dislike" onclick="vote(' + movieId + ', -1)">👎 Не нравится</button>' +
+                        '</div>' +
+                        '<div class="action-buttons">' +
+                            '<button class="watch-btn" onclick="markWatched(' + movieId + ')">👁 Просмотрено</button>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+                
+            } catch (e) {
+                div.innerHTML = '<div class="error show">Ошибка загрузки: ' + e.message + '</div>';
+            }
+        }
+
+        async function getRecommendations() {
+            showScreen('recommendations-screen');
+            const div = document.getElementById('recommendations-list');
+            div.innerHTML = '<div class="loading">🎯 Расчёт общих рекомендаций...</div>';
+            if (!currentRoomId) {
+                div.innerHTML = '<div class="error show">Сначала создайте комнату и проголосуйте за фильмы</div>';
+                return;
+            }
+            try {
+                const [data, personalGenres] = await Promise.all([
+                    safeFetch(API_BASE + '/recommendations/consensus/', {
+                        method: 'POST', 
+                        body: JSON.stringify({ room_id: currentRoomId })
+                    }),
+                    loadPersonalGenres()
+                ]);
+                
+                if (!data || data.length === 0) {
+                    div.innerHTML = '<div class="error show">Нет рекомендаций. Проголосуйте за фильмы или измените предпочтения.</div>';
+                    return;
+                }
+                
+                const combined = combinedRoomSettings;
+                const roomGenres = combined.combined_genres || [];
+                const genresText = roomGenres.map(g => (GENRE_EMOJIS[g] || '') + ' ' + g).join(', ') || 'Любой жанр';
+                const duration = combined.combined_max_duration ? 'до ' + combined.combined_max_duration + ' мин' : 'без ограничения';
+                
+                const header = '<div class="stats-box">' +
+                    '<strong>👥 Общие критерии комнаты:</strong><br>' +
+                    '🎭 Жанры: ' + genresText + '<br>' +
+                    '⏱️ Длительность: ' + duration +
+                '</div>';
+                
+                div.innerHTML = header + data.map((rec, i) => {
+                    const movieGenres = Array.isArray(rec.genres) 
+                        ? rec.genres 
+                        : (rec.genres ? rec.genres.split(',').map(g => g.trim()) : []);
+                    
+                    const roomMatchHtml = renderGenresMatch(roomGenres, movieGenres, false);
+                    const personalMatchHtml = renderGenresMatch(personalGenres, movieGenres, true);
+                    
+                    return '<div class="recommendation-card"><h3>' + (i + 1) + '. ' + rec.title + '</h3>' +
+                        '<div class="score">🎯 Совпадение: ' + rec.score + '%</div>' +
+                        roomMatchHtml +
+                        personalMatchHtml +
+                        '<p style="font-size:13px;margin:8px 0;">Жанры фильма: ' + (rec.genres || 'N/A') + '</p>' +
+                        '<p>Длительность: ' + (rec.duration || '?') + ' мин | Рейтинг: ⭐ ' + (rec.imdb_rating || '?') + '</p>' +
+                    '</div>';
+                }).join('');
+            } catch (e) {
+                div.innerHTML = '<div class="error show">Ошибка: ' + e.message + '</div>';
+            }
+        }
+
+        async function getPersonalRecommendations() {
+            showScreen('recommendations-screen');
+            const div = document.getElementById('recommendations-list');
+            div.innerHTML = '<div class="loading">🔍 Анализирую ваши предпочтения и оценки...</div>';
+            
+            try {
+                const prefs = JSON.parse(sessionStorage.getItem('currentUserGenres') || '[]');
+                if (prefs.length === 0) {
+                    div.innerHTML = '<div class="error show">Настройте предпочтения в профиле (кнопка "Настроить жанры")</div>';
+                    return;
+                }
+                
+                const data = await safeFetch(API_BASE + '/recommendations/personal/', {
+                    method: 'POST',
+                    body: JSON.stringify({ genres: prefs, context: {} })
+                });
+                
+                if (data.error) {
+                    div.innerHTML = '<div class="error show">' + data.error + '</div>';
+                    return;
+                }
+                
+                const results = data.results || [];
+                const stats = data.stats || {};
+                
+                if (results.length === 0) {
+                    div.innerHTML = '<div class="error show">Нет рекомендаций. Попробуйте:<br>• Добавить больше жанров в предпочтения<br>• Поставить оценки фильмам (👍/👎)</div>';
+                    return;
+                }
+                
+                const history = await safeFetch(API_BASE + '/history/').catch(() => []);
+                const watchedIds = history.map(h => String(h.movie));
+                
+                let statsHtml = '';
+                if (stats.liked_genres && stats.liked_genres.length > 0) {
+                    statsHtml += '<div>✅ Понравились жанры: <span class="liked-genres">' + stats.liked_genres.join(', ') + '</span></div>';
+                }
+                if (stats.disliked_genres && stats.disliked_genres.length > 0) {
+                    statsHtml += '<div>❌ Не понравились жанры: <span class="disliked-genres">' + stats.disliked_genres.join(', ') + '</span></div>';
+                }
+                statsHtml += '<div style="margin-top:6px;color:#888;">Лайков: ' + (stats.total_liked || 0) + ' | Дизлайков: ' + (stats.total_disliked || 0) + ' | Просмотрено: ' + (stats.total_watched || 0) + '</div>';
+                
+                const statsBox = statsHtml ? '<div class="stats-box"><strong>📊 Как система учла ваши оценки:</strong><br>' + statsHtml + '</div>' : '';
+                
+                const profileGenres = prefs;
+                
+                div.innerHTML = '<h2 style="color:#667eea;margin-bottom:10px;">🎯 Ваши умные рекомендации</h2>' +
+                    '<p style="color:#666;margin-bottom:15px;">Предпочитаемые жанры: <strong>' + prefs.join(', ') + '</strong></p>' +
+                    statsBox +
+                    results.map((rec, i) => {
+                        const recId = String(rec.id);
+                        const isWatched = watchedIds.includes(recId);
+                        const isLikedMovie = rec.is_liked_movie === true;
+                        const isDislikedMovie = rec.is_disliked_movie === true;
+                        const hasAnyRating = isLikedMovie || isDislikedMovie;
+                        
+                        const movieGenres = Array.isArray(rec.genres) 
+                            ? rec.genres 
+                            : (rec.genres ? rec.genres.split(',').map(g => g.trim()) : []);
+                        
+                        const profileMatchHtml = renderGenresMatch(profileGenres, movieGenres, false);
+                        
+                        let cardClass = '';
+                        if (isLikedMovie) cardClass = 'liked';
+                        else if (isDislikedMovie) cardClass = 'disliked';
+                        
+                        let statusBadge = '';
+                        if (isLikedMovie) {
+                            statusBadge = '<span class="rating-badge like">👍 Вы оценили: Нравится <button onclick="clearMovieRating(' + rec.id + ')" style="background:none;border:none;color:inherit;cursor:pointer;margin-left:4px;" title="Сбросить">✕</button></span>';
+                        }
+                        if (isDislikedMovie) {
+                            statusBadge = '<span class="rating-badge dislike">👎 Вы оценили: Не нравится <button onclick="clearMovieRating(' + rec.id + ')" style="background:none;border:none;color:inherit;cursor:pointer;margin-left:4px;" title="Сбросить">✕</button></span>';
+                        }
+                        
+                        return '<div class="movie-card ' + (isWatched ? 'watched' : '') + ' ' + cardClass + '" data-movie-id="' + rec.id + '">' +
+                            '<h3>' + (i + 1) + '. ' + rec.title + '</h3>' +
+                            '<div class="score" style="background:#667eea;color:white;">Совпадение: ' + rec.score + '%</div>' +
+                            profileMatchHtml +
+                            '<p style="font-size:13px;margin:8px 0;">Жанры фильма: ' + (rec.genres || 'N/A') + '</p>' +
+                            '<p style="font-size:13px;margin:5px 0;">Длительность: ' + (rec.duration || '?') + ' мин | Рейтинг: ⭐ ' + (rec.imdb_rating || '?') + '</p>' +
+                            (statusBadge ? '<div style="margin-top:10px;">' + statusBadge + '</div>' : '') +
+                            '<div class="vote-buttons" style="margin-top:15px;">' +
+                                '<button class="like" onclick="ratePersonalMovie(' + rec.id + ', 1)" ' + (isLikedMovie ? 'disabled' : '') + '>👍 Нравится</button>' +
+                                '<button class="dislike" onclick="ratePersonalMovie(' + rec.id + ', -1)" ' + (isDislikedMovie ? 'disabled' : '') + '>👎 Не нравится</button>' +
+                                (hasAnyRating ? '<button class="secondary" onclick="clearMovieRating(' + rec.id + ')" style="flex:0.5">↺ Сброс</button>' : '') +
+                            '</div>' +
+                            '<div class="action-buttons" style="margin-top:10px;">' +
+                                '<button class="watch-btn" onclick="markWatched(' + rec.id + ')" ' + (isWatched ? 'disabled' : '') + '>' + (isWatched ? '✓ Просмотрено' : '👁 Просмотрено') + '</button>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                    
+            } catch (e) {
+                console.error('Personal recommendations error:', e);
+                div.innerHTML = '<div class="error show">Ошибка: ' + e.message + '</div>';
+            }
+        }
+
+        async function clearMovieRating(movieId) {
+            if (!confirm('Сбросить оценку фильма?')) return;
+            try {
+                const response = await fetch(API_BASE + '/history/ratings/' + movieId + '/', {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+                if (response.status === 204 || response.status === 404) {
+                    showToast('Оценка сброшена');
+                    personalGenresCache = null;
+                    if (document.getElementById('voting-screen').classList.contains('active')) {
+                        loadMovies();
+                    } else if (document.getElementById('recommendations-screen').classList.contains('active')) {
+                        getPersonalRecommendations();
+                    }
+                } else {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || 'Ошибка сервера: ' + response.status);
+                }
+            } catch (e) { 
+                showToast('Ошибка сброса: ' + e.message, 'error');
+                console.error('Clear rating error:', e);
+            }
+        }
+
+        async function ratePersonalMovie(movieId, voteValue) {
+            try {
+                const rating = voteValue > 0 ? 10 : 1;
+                await safeFetch(API_BASE + '/history/ratings/', {
+                    method: 'POST', 
+                    body: JSON.stringify({ movie: movieId, rating: rating })
+                });
+                showToast(voteValue > 0 ? '👍 Фильм понравился!' : '👎 Фильм не понравился');
+                personalGenresCache = null;
+                setTimeout(() => getPersonalRecommendations(), 500);
+            } catch (e) { 
+                showToast('Ошибка оценки: ' + e.message, 'error'); 
+            }
+        }
+
+        async function vote(movieId, voteValue) {
+            if (!currentRoomId) { showToast('Выберите комнату', 'error'); return; }
+            try {
+                await safeFetch(API_BASE + '/rooms/' + currentRoomId + '/vote/', {
+                    method: 'POST', body: JSON.stringify({ movie_id: movieId, vote: voteValue })
+                });
+                
+                const rating = voteValue > 0 ? 10 : 1;
+                await safeFetch(API_BASE + '/history/ratings/', {
+                    method: 'POST',
+                    body: JSON.stringify({ movie: movieId, rating: rating })
+                });
+                
+                showToast(voteValue > 0 ? '👍 Голос принят!' : '👎 Голос принят!');
+                personalGenresCache = null;
+                setTimeout(loadMovies, 500);
+            } catch (e) { showToast('Ошибка голоса', 'error'); }
+        }
+
+        async function markWatched(movieId) {
+            try {
+                await safeFetch(API_BASE + '/history/watched/', {
+                    method: 'POST', body: JSON.stringify({ movie: movieId, completed: true })
+                });
+                showToast('Добавлено в историю просмотров');
+                if (document.getElementById('voting-screen').classList.contains('active')) {
+                    loadMovies();
+                } else if (document.getElementById('recommendations-screen').classList.contains('active')) {
+                    getPersonalRecommendations();
+                }
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function loadMyRatings() {
+            const div = document.getElementById('ratings-list');
+            div.innerHTML = '<div class="loading">Загрузка оценок...</div>';
+            try {
+                const rawRatings = await safeFetch(API_BASE + '/history/ratings/list/');
+                const userRatings = normalizeRatings(rawRatings);
+                const movieIds = Object.keys(userRatings);
+                
+                if (movieIds.length === 0) {
+                    div.innerHTML = '<p style="color:#999;text-align:center;padding:40px;">У вас пока нет оценок.<br>Оценивайте фильмы в рекомендациях!</p>';
+                    return;
+                }
+                
+                const movies = await Promise.all(
+                    movieIds.map(id => 
+                        safeFetch(API_BASE + '/movies/' + id + '/').catch(() => null)
+                    )
+                );
+                
+                const history = await safeFetch(API_BASE + '/history/').catch(() => []);
+                const watchedIds = history.map(h => String(h.movie));
+                const validMovies = movies.filter(m => m !== null);
+                
+                div.innerHTML = '<div style="margin-bottom:20px;"><strong>Всего оценок:</strong> ' + validMovies.length + '</div>' +
+                    validMovies.map((m, i) => {
+                        const movieId = String(m.id);
+                        const rating = userRatings[movieId];
+                        const isWatched = watchedIds.includes(movieId);
+                        const isLiked = rating >= 7;
+                        const isDisliked = rating <= 3;
+                        
+                        return '<div class="movie-card ' + (isWatched ? 'watched' : '') + (isLiked ? ' liked' : '') + (isDisliked ? ' disliked' : '') + '" data-movie-id="' + m.id + '">' +
+                            '<h3>' + (i + 1) + '. ' + m.title + '</h3>' +
+                            '<div class="movie-meta"><span>Жанры: ' + (Array.isArray(m.genres) ? m.genres.join(', ') : m.genres || 'N/A') + '</span><span>Длительность: ' + (m.duration ? m.duration + ' мин' : 'N/A') + '</span><span>Рейтинг: ' + (m.imdb_rating || m.kp_rating || 'N/A') + '</span></div>' +
+                            (isLiked ? '<span class="rating-badge like">👍 Нравится</span>' : '') +
+                            (isDisliked ? '<span class="rating-badge dislike">👎 Не нравится</span>' : '') +
+                            '<div class="action-buttons" style="margin-top:15px;">' +
+                                '<button class="secondary" onclick="clearMovieRating(' + m.id + ')" style="flex:1">↺ Сбросить оценку</button>' +
+                                '<button class="watch-btn" onclick="markWatched(' + m.id + ')" ' + (isWatched ? 'disabled' : '') + '>' + (isWatched ? '✓ Просмотрено' : '👁 Отметить как просмотренное') + '</button>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                    
+            } catch (e) {
+                div.innerHTML = '<div class="error show">Ошибка: ' + e.message + '</div>';
+            }
+        }
+
+        async function loadViewingHistory() {
+            const div = document.getElementById('history-list');
+            div.innerHTML = '<div class="loading">Загрузка истории...</div>';
+            try {
+                const history = await safeFetch(API_BASE + '/history/');
+                if (!history || history.length === 0) {
+                    div.innerHTML = '<p style="color:#999;text-align:center;padding:40px;">История просмотров пуста</p>';
+                    return;
+                }
+                const rawRatings = await safeFetch(API_BASE + '/history/ratings/list/').catch(() => ({}));
+                const userRatings = normalizeRatings(rawRatings);
+                
+                div.innerHTML = '<div style="margin-bottom:20px;"><strong>Всего просмотрено:</strong> ' + history.length + '</div>' +
+                    history.map((item, i) => {
+                        const movieId = String(item.movie || item.movie_id);
+                        const date = item.watched_at ? new Date(item.watched_at).toLocaleDateString('ru-RU') + ' ' + new Date(item.watched_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}) : '—';
+                        const rating = userRatings[movieId];
+                        const isLiked = rating && rating >= 7;
+                        const isDisliked = rating && rating <= 3;
+                        
+                        return '<div class="movie-card ' + (isLiked ? 'liked' : '') + (isDisliked ? 'disliked' : '') + '" style="background: #fff;">' +
+                            '<h3>' + (i + 1) + '. ' + item.movie_title + '</h3>' +
+                            '<div class="movie-meta"><span>📅 Дата просмотра: ' + date + '</span><span>Статус: ' + (item.completed ? 'Просмотрен' : 'В процессе') + '</span></div>' +
+                            (isLiked ? '<span class="rating-badge like">👍 Нравится</span>' : '') +
+                            (isDisliked ? '<span class="rating-badge dislike">👎 Не нравится</span>' : '') +
+                            '<div class="action-buttons" style="margin-top:15px;">' +
+                                '<button class="danger" onclick="removeFromHistory(' + item.id + ')" style="flex:1">🗑 Удалить из истории</button>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                    
+            } catch (e) {
+                div.innerHTML = '<div class="error show">Ошибка загрузки истории: ' + e.message + '</div>';
+            }
+        }
+
+        async function removeFromHistory(historyId) {
+            if (!confirm('Удалить фильм из истории просмотров?')) return;
+            try {
+                await safeFetch(API_BASE + '/history/' + historyId + '/', {
+                    method: 'DELETE'
+                });
+                showToast('Фильм удалён из истории');
+                loadViewingHistory();
+            } catch (e) {
+                showToast('Ошибка удаления: ' + e.message, 'error');
+            }
+        }
+
+        window.onload = async function() {
+            if (authToken) {
+                showScreen('dashboard-screen');
+                await loadCurrentUserId();
+                loadProfile();
+                loadRooms();
+                checkInviteFromUrl();
+            }
+        };
+    </script>
+</body>
+</html>

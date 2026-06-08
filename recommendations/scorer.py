@@ -1,32 +1,100 @@
-def calculate_score(movie, user_prefs, context, votes):
-    pref_genres = user_prefs.get('genres', [])
-    movie_genres = movie.genres or []
+# apps/recommendations/scorer.py
+import logging
+from django.db.models import Avg
+from apps.history.models import ViewingHistory, UserRating  # Новые импорты
+
+logger = logging.getLogger('recommendations')
+
+def calculate_score(movie, user_prefs, context, room_votes, user=None):
+    """
+    Рассчитывает персонализированный скор фильма.
     
-    genre_match = 0.0
-    if pref_genres and movie_genres:
-        intersection = len(set(pref_genres) & set(movie_genres))
-        genre_match = intersection / len(movie_genres)
-
-    context_score = 1.0
-    max_dur = context.get('max_duration')
-    min_rating = context.get('min_rating')
-
-    if max_dur and movie.duration and movie.duration > max_dur:
-        context_score -= 0.3
+    Args:
+        movie: экземпляр Movie
+        user_prefs: dict с предпочтениями пользователя (например, {'genres': [...]})
+        context: dict с фильтрами (max_duration, min_rating)
+        room_votes: list голосов комнаты [-1, 0, 1]
+        user: экземпляр User (обязателен для учёта истории/оценок)
     
-    avg_rating = 0.0
-    kp = movie.kp_rating or 0
-    imdb = (movie.imdb_rating or 0) / 10
-    if kp or imdb:
-        avg_rating = (kp + imdb) / 2
+    Returns:
+        float: скор от 0.0 до 1.0, или -1.0 если фильм уже просмотрен
+    """
+    # ─────────────────────────────────────────────────────────────────────
+    # 0. Быстрая фильтрация по контексту (без изменений)
+    # ─────────────────────────────────────────────────────────────────────
+    if context.get('max_duration') and movie.duration and movie.duration > context['max_duration']:
+        return 0.0
+    if context.get('min_rating'):
+        rating = movie.imdb_rating or movie.kp_rating
+        if rating and rating < context['min_rating']:
+            return 0.0
+
+    # ─────────────────────────────────────────────────────────────────────
+    # 1. Исключаем уже просмотренные фильмы (новая логика)
+    # ─────────────────────────────────────────────────────────────────────
+    if user and ViewingHistory.objects.filter(user=user, movie=movie).exists():
+        return -1.0  # Специальный маркер: скрыть из рекомендаций
+
+    # ─────────────────────────────────────────────────────────────────────
+    # 2. Собираем персональные данные для скоринга
+    # ─────────────────────────────────────────────────────────────────────
+    movie_genres = set(movie.genres or [])
+    user_ratings = UserRating.objects.filter(user=user) if user else None
     
-    if min_rating and avg_rating < min_rating:
-        context_score -= 0.3
+    # Жанры из фильмов, которые пользователь оценил >= 7 (сигнал "нравится")
+    liked_genres = set()
+    if user_ratings and user_ratings.exists():
+        for r in user_ratings.filter(rating__gte=7):
+            liked_genres.update(r.movie.genres or [])
+    
+    # Также учитываем жанры из профиля (если нет оценок)
+    profile_genres = set(user_prefs.get('genres', []))
+    all_liked_genres = liked_genres | profile_genres
 
-    consensus_score = 0.5
-    if votes:
-        avg_vote = sum(votes) / len(votes)
-        consensus_score = (avg_vote + 1) / 2
+    # ─────────────────────────────────────────────────────────────────────
+    # 3. Рассчитываем компоненты скоринга
+    # ─────────────────────────────────────────────────────────────────────
+    
+    # 3.1 Совпадение жанров (вес: 0.35)
+    genre_score = 0.0
+    if all_liked_genres and movie_genres:
+        genre_score = len(all_liked_genres & movie_genres) / len(all_liked_genres)
+    
+    # 3.2 Персональный рейтинг (вес: 0.25)
+    rating_score = 0.5  # fallback по умолчанию
+    if user_ratings and user_ratings.exists():
+        avg_personal = user_ratings.aggregate(Avg('rating'))['rating__avg'] or 5.0
+        movie_rating = movie.imdb_rating or movie.kp_rating or 5.0
+        # Комбинация: 60% глобальный рейтинг фильма, 40% средний рейтинг пользователя
+        rating_score = (movie_rating / 10.0) * 0.6 + (avg_personal / 10.0) * 0.4
+    else:
+        # Если оценок нет, используем глобальный рейтинг
+        movie_rating = movie.imdb_rating or movie.kp_rating or 5.0
+        rating_score = movie_rating / 10.0
 
-    final_score = (0.5 * genre_match) + (0.3 * context_score) + (0.2 * consensus_score)
-    return max(0.0, min(1.0, final_score))
+    # 3.3 Голоса комнаты (вес: 0.20)
+    if room_votes:
+        # Нормализация: [-1, 1] -> [0, 1]
+        room_score = (sum(room_votes) / len(room_votes) + 1) / 2.0
+    else:
+        room_score = 0.5  # нейтрально, если нет голосов
+
+    # 3.4 Доверие к персонализации (вес: 0.20)
+    # Чем больше оценок у пользователя, тем больше вес его предпочтений
+    personal_confidence = 0.5
+    if user_ratings and user_ratings.exists():
+        count = user_ratings.count()
+        personal_confidence = min(1.0, count / 10.0)  # 10 оценок = максимум доверия
+
+    # ─────────────────────────────────────────────────────────────────────
+    # 4. Итоговая формула
+    # ─────────────────────────────────────────────────────────────────────
+    total = (
+        0.35 * genre_score +
+        0.25 * rating_score +
+        0.20 * room_score +
+        0.20 * personal_confidence
+    )
+    
+    # Гарантируем диапазон [0.0, 1.0]
+    return max(0.0, min(1.0, total))
