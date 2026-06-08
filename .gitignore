@@ -67,6 +67,11 @@ schema.json
 project_structure.txt
 structure.txt
 
+# IMDb Data (большие файлы > 100MB)
+imdb_data/
+imdb_data/title.basics.tsv
+imdb_data/title.ratings.tsv
+
 # Logs
 *.log
 logs/

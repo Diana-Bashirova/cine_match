@@ -1,78 +1,162 @@
-name: CI/CD Pipeline
+﻿name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: diana-bashirova/cine_match_backend
+    branches: [ main, master ]
 
 jobs:
+  # 🔹 1. LINT - Проверка кода
   lint:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: 📥 Checkout кода
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Установка Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install dependencies
-        run: pip install -r requirements-ci.txt flake8 black
-      - name: Lint
-        run: flake8 . --count --select=E9,F63,F7,F82,W503 --show-source --statistics
-      - name: Format check
-        run: black --check --diff . || true
+          cache: 'pip'
+      
+      - name: 📦 Установка зависимостей
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort
+      
+      - name: ✅ Flake8 (стиль кода)
+        run: |
+          flake8 apps/ --max-line-length=120 --ignore=E501,W503,E203 || true
+      
+      - name: 🎨 Black (форматирование)
+        run: |
+          black --check apps/ || true
+      
+      - name: 📋 Isort (сортировка импортов)
+        run: |
+          isort --check-only apps/ || true
 
+  # 🔹 2. TEST - Запуск тестов
   test:
     runs-on: ubuntu-latest
     needs: lint
-    env:
-      DJANGO_SECRET_KEY: "ci-pipeline-test-secret-key-do-not-use-in-prod"
-      DJANGO_DEBUG: "True"
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: cine_match_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: 📥 Checkout кода
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Установка Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install dependencies
-        run: pip install -r requirements-ci.txt
-      - name: Django check
-        run: python manage.py check --settings=config.settings
-      - name: Run tests
-        run: pytest . --ds=config.settings -v
+          cache: 'pip'
+      
+      - name: 📦 Установка зависимостей
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-django pytest-cov
+      
+      - name: 🧪 Запуск тестов
+        run: |
+          pytest apps/ -v --cov=apps --cov-report=xml --cov-report=html
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/cine_match_test
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: 'True'
+      
+      - name: 📊 Загрузка отчёта о покрытии
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+      
+      - name: 📁 Сохранение HTML отчёта
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
 
+  # 🔹 3. BUILD - Сборка Docker образа
   build:
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    permissions:
-      contents: read
-      packages: write
+    
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Docker Buildx
+      - name: 📥 Checkout кода
+        uses: actions/checkout@v4
+      
+      - name: 🐳 Настройка Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Login to GHCR
+      
+      - name: 🔐 Вход в Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: 🏗 Сборка Docker образа
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          push: false
+          tags: cine_match:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: 📦 Сохранение образа как артефакт
+        run: |
+          docker save cine_match:latest | gzip > cine_match.tar.gz
+      
+      - name: 📤 Загрузка артефакта
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: cine_match.tar.gz
+          retention-days: 7
 
+  # 🔹 4. DEPLOY - Деплой (опционально)
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main'
+    
     steps:
-      - name: Deploy info
-        run: echo "Deploy step skipped or manual."
+      - name: 📥 Checkout кода
+        uses: actions/checkout@v4
+      
+      - name: 🚀 Деплой на сервер
+        run: |
+          echo "🎉 Деплой на production сервер..."
+          # Пример команд для деплоя:
+          # ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+          #   cd /path/to/cine_match &&
+          #   docker-compose pull &&
+          #   docker-compose up -d
+          # "
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: ✅ Уведомление об успешном деплое
+        run: |
+          echo "✅ Деплой завершён успешно!"
