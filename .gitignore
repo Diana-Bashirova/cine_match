@@ -75,3 +75,8 @@ imdb_data/title.ratings.tsv
 # Logs
 *.log
 logs/
+
+# Временные файлы
+*.tmp
+*.bak
+*.backup
